@@ -8,41 +8,45 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var message string //global var
-
-func HelloHandler(w http.ResponseWriter, r *http.Request) {
+func GetMessages(w http.ResponseWriter, r *http.Request) {
 	// hello handler
-	fmt.Fprintf(w, "Hello, %s\n", message)
-
+	var msg []Message
+	DB.Find(&msg)
+	// print all slice
+	for _, v := range msg {
+		fmt.Fprintf(w, "%s\n", v.Text)
+	}
 }
 
-func PostHandler(w http.ResponseWriter, r *http.Request) {
+func CreateMessages(w http.ResponseWriter, r *http.Request) {
 	// post handler
 	body := json.NewDecoder(r.Body)
 	// new struct for message
 	var rB requestBody
+	var msg Message
 	// decode body to new struct
 	err := body.Decode(&rB)
 	if err != nil {
 		panic(err)
 	}
 	// pass string(json) from body to var message
-	message = rB.Message
-	//fmt.Fprintf(w, "Hello %s", rB.Message)
+	msg.Text = rB.Message
+	// create new entry to DB
+	DB.Create(&msg)
 }
 
 type requestBody struct {
 	// new struct
-	Message string `json:"message"`
+	Message string `json:"text"`
 }
 
 func main() {
 
+	InitDB()
+	DB.AutoMigrate(&Message{})
 	// make newrouter
 	router := mux.NewRouter()
-	// make new handlers GET an POST
-	router.HandleFunc("/api/hello", HelloHandler).Methods("GET")
-	router.HandleFunc("/", PostHandler).Methods("POST")
-	// run listener of port
+	router.HandleFunc("/api/messages", CreateMessages).Methods("POST")
+	router.HandleFunc("/api/messages", GetMessages).Methods("GET")
 	http.ListenAndServe(":8080", router)
 }
