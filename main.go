@@ -8,6 +8,36 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func UpdateMessages(w http.ResponseWriter, r *http.Request) {
+	// proc request PATCH
+	body := json.NewDecoder(r.Body)
+	var rB requestBody
+	var msg Message
+	err := body.Decode(&rB)
+	if err != nil {
+		panic(err)
+	}
+
+	// req to DB for update by ID
+	msg.Text, msg.ID = rB.Message, rB.ID
+	//fmt.Fprintf(w, "ID:_%d\nText:_%s", msg.ID, msg.Text)
+	DB.Save(&msg)
+}
+
+func DeleteMessages(w http.ResponseWriter, r *http.Request) {
+	// proc request PATCH
+	body := json.NewDecoder(r.Body)
+	var rB requestBody
+	var msg Message
+	err := body.Decode(&rB)
+	if err != nil {
+		panic(err)
+	}
+	// req to DB for update by ID
+	msg.ID = rB.ID
+	DB.Delete(&msg)
+}
+
 func GetMessages(w http.ResponseWriter, r *http.Request) {
 	// hello handler
 	var msg []Message
@@ -30,13 +60,14 @@ func CreateMessages(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	// pass string(json) from body to var message
-	msg.Text = rB.Message
+	msg.ID = rB.ID
 	// create new entry to DB
 	DB.Create(&msg)
 }
 
 type requestBody struct {
 	// new struct
+	ID      uint   `json: "id"`
 	Message string `json:"text"`
 }
 
@@ -48,5 +79,8 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/api/messages", CreateMessages).Methods("POST")
 	router.HandleFunc("/api/messages", GetMessages).Methods("GET")
+	router.HandleFunc("/api/messages", UpdateMessages).Methods("PATCH")
+	router.HandleFunc("/api/messages", DeleteMessages).Methods("DELETE")
+
 	http.ListenAndServe(":8080", router)
 }
