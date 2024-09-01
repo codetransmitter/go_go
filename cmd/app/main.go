@@ -1,13 +1,14 @@
 package main
 
 import (
-	"net/http"
-
 	"go_go/internal/database"
 	"go_go/internal/handlers"
 	"go_go/internal/messagesService"
+	"go_go/internal/web/messages"
+	"log"
 
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
@@ -19,12 +20,20 @@ func main() {
 	service := messagesService.NewService(repo)
 
 	handler := handlers.NewHandler(service)
-	// make newrouter
-	router := mux.NewRouter()
-	router.HandleFunc("/api/post", handler.CreateMessage).Methods("POST")
-	router.HandleFunc("/api/get", handler.GetMessagesHandler).Methods("GET")
-	router.HandleFunc("/api/patch", handler.UpdateMessageByID).Methods("PATCH")
-	router.HandleFunc("/api/del", handler.DeleteMessageByID).Methods("DELETE")
 
-	http.ListenAndServe(":8080", router)
+	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+
+	// make newrouter
+	strictHandler := messages.NewStrictHandler(handler, nil)
+	messages.RegisterHandlers(e, strictHandler)
+
+	if err := e.Start(":8080"); err != nil {
+		log.Fatalf("failed to start with err: %v", err)
+	}
 }
+
+// TODO: dsfsdfsdf
+// TO DO: sdfsdfds
+// TODO - testr
