@@ -37,7 +37,7 @@ func (r *messageRepository) GetAllMessages() ([]Message, error) {
 	return messages, err
 }
 func (r *messageRepository) UpdateMessageByID(id uint, message Message) (Message, error) {
-
+	message.ID = id //TODO: nuuuu hz need refactoring????
 	result := r.db.Save(&message)
 	if result.Error != nil {
 		return Message{}, result.Error

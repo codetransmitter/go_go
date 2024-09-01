@@ -19,14 +19,26 @@ type Message struct {
 	Message *string `json:"message,omitempty"`
 }
 
+// DeleteMessagesJSONRequestBody defines body for DeleteMessages for application/json ContentType.
+type DeleteMessagesJSONRequestBody = Message
+
+// PatchMessagesJSONRequestBody defines body for PatchMessages for application/json ContentType.
+type PatchMessagesJSONRequestBody = Message
+
 // PostMessagesJSONRequestBody defines body for PostMessages for application/json ContentType.
 type PostMessagesJSONRequestBody = Message
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Delete message by id
+	// (DELETE /messages)
+	DeleteMessages(ctx echo.Context) error
 	// Get all messages
 	// (GET /messages)
 	GetMessages(ctx echo.Context) error
+	// Update message by id
+	// (PATCH /messages)
+	PatchMessages(ctx echo.Context) error
 	// Create a new message
 	// (POST /messages)
 	PostMessages(ctx echo.Context) error
@@ -37,12 +49,30 @@ type ServerInterfaceWrapper struct {
 	Handler ServerInterface
 }
 
+// DeleteMessages converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteMessages(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteMessages(ctx)
+	return err
+}
+
 // GetMessages converts echo context to params.
 func (w *ServerInterfaceWrapper) GetMessages(ctx echo.Context) error {
 	var err error
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetMessages(ctx)
+	return err
+}
+
+// PatchMessages converts echo context to params.
+func (w *ServerInterfaceWrapper) PatchMessages(ctx echo.Context) error {
+	var err error
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PatchMessages(ctx)
 	return err
 }
 
@@ -83,9 +113,27 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.DELETE(baseURL+"/messages", wrapper.DeleteMessages)
 	router.GET(baseURL+"/messages", wrapper.GetMessages)
+	router.PATCH(baseURL+"/messages", wrapper.PatchMessages)
 	router.POST(baseURL+"/messages", wrapper.PostMessages)
 
+}
+
+type DeleteMessagesRequestObject struct {
+	Body *DeleteMessagesJSONRequestBody
+}
+
+type DeleteMessagesResponseObject interface {
+	VisitDeleteMessagesResponse(w http.ResponseWriter) error
+}
+
+type DeleteMessages204Response struct {
+}
+
+func (response DeleteMessages204Response) VisitDeleteMessagesResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
 }
 
 type GetMessagesRequestObject struct {
@@ -98,6 +146,23 @@ type GetMessagesResponseObject interface {
 type GetMessages200JSONResponse []Message
 
 func (response GetMessages200JSONResponse) VisitGetMessagesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchMessagesRequestObject struct {
+	Body *PatchMessagesJSONRequestBody
+}
+
+type PatchMessagesResponseObject interface {
+	VisitPatchMessagesResponse(w http.ResponseWriter) error
+}
+
+type PatchMessages200JSONResponse Message
+
+func (response PatchMessages200JSONResponse) VisitPatchMessagesResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
@@ -123,9 +188,15 @@ func (response PostMessages201JSONResponse) VisitPostMessagesResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Delete message by id
+	// (DELETE /messages)
+	DeleteMessages(ctx context.Context, request DeleteMessagesRequestObject) (DeleteMessagesResponseObject, error)
 	// Get all messages
 	// (GET /messages)
 	GetMessages(ctx context.Context, request GetMessagesRequestObject) (GetMessagesResponseObject, error)
+	// Update message by id
+	// (PATCH /messages)
+	PatchMessages(ctx context.Context, request PatchMessagesRequestObject) (PatchMessagesResponseObject, error)
 	// Create a new message
 	// (POST /messages)
 	PostMessages(ctx context.Context, request PostMessagesRequestObject) (PostMessagesResponseObject, error)
@@ -143,6 +214,35 @@ type strictHandler struct {
 	middlewares []StrictMiddlewareFunc
 }
 
+// DeleteMessages operation middleware
+func (sh *strictHandler) DeleteMessages(ctx echo.Context) error {
+	var request DeleteMessagesRequestObject
+
+	var body DeleteMessagesJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteMessages(ctx.Request().Context(), request.(DeleteMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteMessages")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(DeleteMessagesResponseObject); ok {
+		return validResponse.VisitDeleteMessagesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // GetMessages operation middleware
 func (sh *strictHandler) GetMessages(ctx echo.Context) error {
 	var request GetMessagesRequestObject
@@ -153,12 +253,42 @@ func (sh *strictHandler) GetMessages(ctx echo.Context) error {
 	for _, middleware := range sh.middlewares {
 		handler = middleware(handler, "GetMessages")
 	}
+
 	response, err := handler(ctx, request)
 
 	if err != nil {
 		return err
 	} else if validResponse, ok := response.(GetMessagesResponseObject); ok {
 		return validResponse.VisitGetMessagesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PatchMessages operation middleware
+func (sh *strictHandler) PatchMessages(ctx echo.Context) error {
+	var request PatchMessagesRequestObject
+
+	var body PatchMessagesJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchMessages(ctx.Request().Context(), request.(PatchMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchMessages")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PatchMessagesResponseObject); ok {
+		return validResponse.VisitPatchMessagesResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -174,14 +304,16 @@ func (sh *strictHandler) PostMessages(ctx echo.Context) error {
 		return err
 	}
 	request.Body = &body
-	
+
 	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
 		return sh.ssi.PostMessages(ctx.Request().Context(), request.(PostMessagesRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
 		handler = middleware(handler, "PostMessages")
 	}
+
 	response, err := handler(ctx, request)
+
 	if err != nil {
 		return err
 	} else if validResponse, ok := response.(PostMessagesResponseObject); ok {

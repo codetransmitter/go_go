@@ -2,16 +2,19 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
-
 	//"fmt"
 	"go_go/internal/messagesService"
 	"go_go/internal/web/messages"
-	"net/http"
 )
 
 type Handler struct {
 	Service *messagesService.MessageService
+}
+
+func NewHandler(service *messagesService.MessageService) *Handler {
+	return &Handler{
+		Service: service,
+	}
 }
 
 func (h *Handler) GetMessages(_ context.Context, _ messages.GetMessagesRequestObject) (messages.GetMessagesResponseObject, error) {
@@ -58,38 +61,31 @@ func (h *Handler) PostMessages(_ context.Context, request messages.PostMessagesR
 	return response, nil
 }
 
-func NewHandler(service *messagesService.MessageService) *Handler {
-	return &Handler{
-		Service: service,
+func (h *Handler) PatchMessages(_ context.Context, request messages.PatchMessagesRequestObject) (messages.PatchMessagesResponseObject, error) {
+	messageRequest := request.Body
+	idToUpdate := uint(*messageRequest.Id)
+	messageToUpdate := messagesService.Message{Text: *messageRequest.Message}
+
+	//fmt.Println("\n********============\nPATCH_ID=", idToUpdate, "\n***********=============")
+	updateMessage, err := h.Service.UpdateMessageByID(idToUpdate, messageToUpdate)
+	if err != nil {
+		return nil, err
 	}
+	// создаем структуру респонс
+	response := messages.PatchMessages200JSONResponse{
+		Id:      &updateMessage.ID,
+		Message: &updateMessage.Text,
+	}
+	// Просто возвращаем респонс!
+	return response, nil
 }
 
-func (h *Handler) UpdateMessageByID(w http.ResponseWriter, r *http.Request) {
-	var message messagesService.Message
-	err := json.NewDecoder(r.Body).Decode(&message)
+func (h *Handler) DeleteMessages(_ context.Context, request messages.DeleteMessagesRequestObject) (messages.DeleteMessagesResponseObject, error) {
+	messageRequest := request.Body
+	idToDelete := uint(*messageRequest.Id)
+	err := h.Service.DeleteMessageByID(idToDelete)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return nil, err
 	}
-	updateMessage, err := h.Service.UpdateMessageByID(message.ID, message)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(updateMessage)
-}
-
-func (h *Handler) DeleteMessageByID(w http.ResponseWriter, r *http.Request) {
-	var message messagesService.Message
-	err := json.NewDecoder(r.Body).Decode(&message)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	err = h.Service.DeleteMessageByID(message.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return nil, err
 }

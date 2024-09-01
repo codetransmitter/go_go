@@ -33,7 +33,3 @@ func main() {
 		log.Fatalf("failed to start with err: %v", err)
 	}
 }
-
-// TODO: dsfsdfsdf
-// TO DO: sdfsdfds
-// TODO - testr
