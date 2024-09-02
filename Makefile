@@ -22,3 +22,6 @@ run:
 # Теперь при вызове make run мы запустим наш сервер 
 gen:
 	oapi-codegen -config openapi/.openapi -include-tags messages -package messages openapi/openapi.yaml > ./internal/web/messages/api.gen.go
+# linter for analyzes code for errors
+lint:
+	golangci-lint run --out-format=colored-line-number
