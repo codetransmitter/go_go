@@ -20,8 +20,10 @@ migrate-down:
 run:
 	go run cmd/app/main.go 
 # Теперь при вызове make run мы запустим наш сервер 
-gen:
+genMessage:
 	oapi-codegen -config openapi/.openapi -include-tags messages -package messages openapi/openapi.yaml > ./internal/web/messages/api.gen.go
+genUser:
+	oapi-codegen -config openapi/.openapi -include-tags users -package users openapi/openapi.yaml > ./internal/web/users/api.gen.go
 # linter for analyzes code for errors
 lint:
 	golangci-lint run --out-format=colored-line-number
